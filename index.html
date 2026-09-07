@@ -154,6 +154,8 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
       <button class="btn sm" id="statBtn">📊 Профиль</button>
     </div>
     <button class="btn ad" id="adBtn">📺 +50 очков за рекламу</button>
+    <button class="btn ad" id="shieldStartBtn">📺 ЩИТ на старт (8 сек)</button>
+    <button class="btn ad" id="magnetStartBtn">📺 МАГНИТ на старт (10 сек)</button>
     <div class="sub" id="metaLine" style="font-size:11.5px"></div>
     <div class="sub" id="pcHint" style="font-size:11.5px;display:none">🖥 WASD/стрелки — бег · Пробел — рывок</div>
   </div>
@@ -169,6 +171,8 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
       👴 <b>Дед с палкой</b> бегает за тобой. Поймал — минус ❤️<br>
       🐕 <b>Собака</b> — с 5-го уровня тоже гонится и кусает. Укусила — минус ❤️<br>
       ❄️ <b>Снежинка</b> — заморозить деда · ⚡ <b>молния</b> — ускорение<br>
+      🛡 <b>Щит</b> — неуязвимость · 🧲 <b>магнит</b> — тянет овец<br>
+      💣 <b>Бомба</b> — взорвать ВСЕХ овец · ⭐ <b>золотая овца</b> — ×3 очков!<br>
       📍 <b>Взорви N овец</b> (смотри чип 🐑) — уровень пройден!<br>
       ✅ Заставка «УРОВЕНЬ ПРОЙДЕН» → новая локация:<br>
       ферма → закат → ночь → осень → пустыня → снег ❄️<br>
@@ -199,6 +203,7 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
     <div class="sub" id="overStats"></div>
     <button class="btn r" id="reviveBtn" style="display:none">📺 ВОСКРЕСНУТЬ</button>
     <button class="btn ad" id="x2Btn">📺 ×2 ОЧКОВ</button>
+    <button class="btn ad" id="bonusTimeBtn" style="display:none">📺 +30 СЕК (сохранить забег)</button>
     <button class="btn" id="againBtn">ЕЩЁ РАЗ</button>
     <div class="row">
       <button class="btn sm" id="shareBtn">📣 Поделиться</button>
@@ -563,6 +568,7 @@ function share(t){
 }
 
 var adBusy=false,nativeOK=true;
+var _interT=0;
 function checkAds(){
   var b=vkBridgeNow();
   if(!b||!b.supportsAsync)return;
@@ -575,8 +581,16 @@ function watchAd(cb){
   bridge.send('VKWebAppShowNativeAds',{ad_format:'reward'}).then(function(d){
     adBusy=false;
     if(d&&d.result){toast('📺 Спасибо за просмотр!');cb(true);}
-    else{sfx('err');toast('Реклама сейчас недоступна');}
-  }).catch(function(){adBusy=false;sfx('err');toast('Реклама сейчас недоступна');});
+    else{sfx('err');toast('Реклама сейчас недоступна');cb(false);}
+  }).catch(function(){adBusy=false;sfx('err');toast('Реклама сейчас недоступна');cb(false);});
+}
+function showInterstitial(cb){
+  if(!VK.ready||!nativeOK){if(cb)cb();return;}
+  if(adBusy){if(cb)cb();return;}
+  adBusy=true;
+  bridge.send('VKWebAppShowNativeAds',{ad_format:'interstitial'}).then(function(){
+    adBusy=false;if(cb)cb();
+  }).catch(function(){adBusy=false;if(cb)cb();});
 }
 
 /* ============================================================
@@ -632,11 +646,17 @@ var LOCALES=[
 function sheepNeedFor(lvl){return 3+lvl;}              /* lvl1=4, lvl2=5, lvl3=6… */
 function locOf(lvl){return LOCALES[(lvl-1)%LOCALES.length];}
 function mkArena(){
+  var _pendingShield=0,_pendingMagnet=0;
+  if(_startBonuses.shield){_pendingShield=_startBonuses.shield;_startBonuses.shield=0;}
+  if(_startBonuses.magnet){_pendingMagnet=_startBonuses.magnet;_startBonuses.magnet=0;}
   W={ram:null,sheep:[],oldman:null,dog:null,parts:[],powerups:[],fx:[],
      bushes:[],rocks:[],fences:[],t:0,time:75,lives:3,score:0,combo:0,comboT:0,
      anger:0,freezeT:0,speedT:0,powerT:0,over:false,won:false,
      lvl:1,loc:locOf(1),yellCd:0,levelSheep:0,sheepNeed:sheepNeedFor(1),levelUp:false,
-     sawDog:false,killer:''};
+     sawDog:false,killer:'',
+     shieldT:_pendingShield,magnetT:_pendingMagnet};
+  if(_pendingShield>0)toast('🛡 Щит активен '+_pendingShield+' сек!');
+  if(_pendingMagnet>0)toast('🧲 Магнит активен '+_pendingMagnet+' сек!');
   spawnRam();
   spawnSheep();
   spawnOldMan();
@@ -852,6 +872,8 @@ function updateSheep(dt){
     var s=W.sheep[i];
     if(s.dead)continue;
     s.wob+=dt*3;
+    /* таймер золотой овцы */
+    if(s.golden){s.goldenT-=dt;if(s.goldenT<=0)s.golden=false;}
     var r=W.ram;
     var d=dist2(s.x,s.y,r.x,r.y);
     if(s.state==='idle'){
@@ -895,17 +917,34 @@ function explodeSheep(i){
   if(W.levelUp)return;
   var s=W.sheep[i];
   s.dead=1;
-  var pts=10;
+  var pts=s.golden?30:10;
   if(W.comboT>0)pts*=W.combo;
   W.score+=pts;
   W.combo++;
-  W.comboT=2;
+  W.comboT=2.5;
   W.anger=Math.min(6,W.anger+0.25);
   P.booms++;
   spawnBoom(s.x,s.y);
+  if(s.golden){
+    /* золотой взрыв — больше частиц */
+    for(var gi=0;gi<8;gi++){
+      var ga=Math.random()*6.29,gsp=rf(2,5);
+      W.parts.push({x:s.x,y:s.y,vx:Math.cos(ga)*gsp,vy:Math.sin(ga)*gsp,life:rf(.4,.8),max:.8,
+        col:pick(['#ffd24a','#ffe08a','#fff']),r:rf(2,4),grav:.4});
+    }
+    toast('⭐ ЗОЛОТАЯ +'+pts+'!');
+  }
   sfx('boom',.8);haptic('heavy');
   sfx('score',.6);
   if(W.combo>1)sfx('combo',.7);
+  /* всплывающий текст очков */
+  W.fx.push({t:'txt',x:s.x,y:s.y-0.5,text:'+'+pts,
+    col:s.golden?'#ffd24a':(W.combo>2?'#ff6a9a':'#fff'),
+    life:1.2,max:1.2,size:s.golden?20:(W.combo>2?18:14)});
+  if(W.combo>1){
+    W.fx.push({t:'txt',x:s.x,y:s.y-1.2,text:'×'+W.combo+' COMBO!',
+      col:'#ffd24a',life:1.4,max:1.4,size:16});
+  }
   /* ==== счёт овец уровня ==== */
   W.levelSheep++;
   paintHud();
@@ -995,6 +1034,20 @@ function updateOldMan(dt){
   o.swing+=dt;
   /* поймал барана */
   if(d<0.7&&r.inv<=0){
+    if(W.shieldT>0){
+      /* щит поглотил удар — отбрасываем деда */
+      W.shieldT=0;
+      sfx('freeze',.8);haptic('medium');
+      toast('🛡 Щит поглотил удар!');
+      spawnBoom(r.x,r.y);
+      r.inv=1.2;
+      /* отталкиваем деда */
+      var kx=o.x-r.x,ky=o.y-r.y,kl=Math.hypot(kx,ky)||1;
+      o.x+=kx/kl*4;o.y+=ky/kl*4;
+      o.x=clamp(o.x,1.2,AW-1.2);o.y=clamp(o.y,1.2,AH-1.2);
+      paintHud();
+      return;
+    }
     W.killer='man';
     W.lives--;
     r.inv=1.6;
@@ -1037,6 +1090,19 @@ function updateDog(dt){
   }
   /* укусил барана — минус ❤️, как и дед */
   if(dist<0.75&&r.inv<=0){
+    if(W.shieldT>0){
+      W.shieldT=0;
+      sfx('freeze',.8);haptic('medium');
+      toast('🛡 Щит спас от собаки!');
+      spawnBoom(r.x,r.y);
+      r.inv=1.2;
+      d.stagger=1.2;
+      var kx=d.x-r.x,ky=d.y-r.y,kl=Math.hypot(kx,ky)||1;
+      d.x+=kx/kl*4;d.y+=ky/kl*4;
+      d.x=clamp(d.x,1.2,AW-1.2);d.y=clamp(d.y,1.2,AH-1.2);
+      paintHud();
+      return;
+    }
     W.killer='dog';
     W.lives--;
     r.inv=1.6;
@@ -1054,10 +1120,24 @@ function updateDog(dt){
 }
 function updatePowerups(dt){
   W.powerT-=dt;
-  if(W.powerT<=0&&W.powerups.length<2){
-    W.powerT=rf(5,8);
-    var t=pick(['freeze','speed']);
-    W.powerups.push({x:rf(1.5,AW-1.5),y:rf(1.5,AH-1.5),t:t,life:10});
+  if(W.powerT<=0&&W.powerups.length<3){
+    W.powerT=rf(4,7);
+    var t=pick(['freeze','speed','freeze','speed','shield','bomb','magnet']);
+    W.powerups.push({x:rf(1.5,AW-1.5),y:rf(1.5,AH-1.5),t:t,life:12});
+  }
+  /* золотая овца — редкий спавн (5% каждые 8 сек) */
+  if(!W._goldenCd)W._goldenCd=rf(10,16);
+  W._goldenCd-=dt;
+  if(W._goldenCd<=0){
+    W._goldenCd=rf(12,20);
+    /* ищем овцу, которая не беременна, и делаем золотой */
+    var candidates=W.sheep.filter(function(s){return !s.dead&&s.state==='idle'&&!s.golden;});
+    if(candidates.length>0&&Math.random()<0.5){
+      var gs=pick(candidates);
+      gs.golden=true;gs.goldenT=8;/* 8 секунд золотая */
+      toast('⭐ Золотая овца! ×3 очков!');
+      sfx('combo',.7);
+    }
   }
   var r=W.ram;
   for(var i=W.powerups.length-1;i>=0;i--){
@@ -1066,12 +1146,46 @@ function updatePowerups(dt){
     if(p.life<=0){W.powerups.splice(i,1);continue;}
     if(dist2(p.x,p.y,r.x,r.y)<1){
       if(p.t==='freeze'){W.freezeT=3;sfx('freeze');toast('❄️ Дед замёрз!');}
-      else{W.speedT=4;sfx('power');toast('⚡ Ускорение!');}
+      else if(p.t==='speed'){W.speedT=4;sfx('power');toast('⚡ Ускорение!');}
+      else if(p.t==='shield'){W.shieldT=6;sfx('power');toast('🛡 Щит на 6 сек!');haptic('medium');}
+      else if(p.t==='magnet'){W.magnetT=7;sfx('power');toast('🧲 Магнит на 7 сек!');haptic('medium');}
+      else if(p.t==='bomb'){
+        sfx('boom',1.2);haptic('heavy');toast('💣 БОМБА! Все овцы взорвались!');
+        W.shake=Math.max(W.shake,10);
+        /* взорвать все овцы на поле */
+        for(var bi=W.sheep.length-1;bi>=0;bi--){
+          if(!W.sheep[bi].dead){
+            spawnBoom(W.sheep[bi].x,W.sheep[bi].y);
+            var bPts=W.sheep[bi].golden?30:10;
+            if(W.comboT>0)bPts*=W.combo;
+            W.score+=bPts;P.booms++;W.levelSheep++;
+            W.sheep[bi].dead=1;
+          }
+        }
+        W.combo+=2;W.comboT=2;
+        if(W.levelSheep>=W.sheepNeed){W.powerups.splice(i,1);levelComplete();return;}
+        /* респавним овец */
+        spawnSheep();
+      }
       W.powerups.splice(i,1);
     }
   }
   W.freezeT=Math.max(0,W.freezeT-dt);
   W.speedT=Math.max(0,W.speedT-dt);
+  W.shieldT=Math.max(0,W.shieldT-dt);
+  W.magnetT=Math.max(0,W.magnetT-dt);
+  /* магнит: притягиваем овец к барану */
+  if(W.magnetT>0){
+    for(var mi=0;mi<W.sheep.length;mi++){
+      var ms=W.sheep[mi];
+      if(ms.dead||ms.state==='preg')continue;
+      var mdx=r.x-ms.x,mdy=r.y-ms.y,md=Math.hypot(mdx,mdy);
+      if(md<6&&md>0.5){
+        var pull=1.8*(1-md/6);
+        moveEntity(ms,mdx/md*pull,mdy/md*pull,dt);
+      }
+    }
+  }
 }
 function updateTime(dt){
   if(W.over||W.levelUp)return;   /* время не тикает на заставке */
@@ -1089,12 +1203,23 @@ function endRun(won){
   if(W.score>P.best){P.best=W.score;save();}
   save();
   musStop();
+  /* интерстициальная реклама каждые 2 забега */
+  if(P.games%2===0){
+    showInterstitial();
+  }
   $('overTtl').textContent=won?'⏱ Время вышло!':(W.killer==='dog'?'🐕 Собака догнала!':'Дед догнал!');
   $('overScore').textContent=W.score;
   $('overStats').innerHTML='Взорвано овец: <b style="color:#ff8a9a">'+P.booms+'</b><br>'+
     'Лучший комбо: <b style="color:#ffd24a">x'+W.combo+'</b><br>'+
     'Рекорд: <b style="color:#ffd24a">'+P.best+'</b>';
   $('reviveBtn').style.display=won?'none':'block';
+  /* кнопка "+30 сек" — если время вышло */
+  var bt=$('bonusTimeBtn');
+  if(won&&!W._bonusTimeUsed){bt.style.display='block';W._bonusTimeUsed=true;}
+  else{bt.style.display='none';}
+  /* кнопки "ещё раз" и "×2" */
+  $('x2Btn').classList.remove('no');
+  $('x2Btn').onclick=function(){sfx('click');x2Score();};
   showScr('overScr');
 }
 function revive(){
@@ -1261,7 +1386,17 @@ function render(){
     var px=sx(pu.x),py=sy(pu.y);
     var bob=Math.sin(W.t*3+pu.x)*3;
     ctx.font=(16*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(pu.t==='freeze'?'❄️':'⚡',px,py-8*SCALE+bob);
+    var puEmoji='⚡';
+    if(pu.t==='freeze')puEmoji='❄️';
+    else if(pu.t==='shield')puEmoji='🛡';
+    else if(pu.t==='bomb')puEmoji='💣';
+    else if(pu.t==='magnet')puEmoji='🧲';
+    /* свечение вокруг бонуса */
+    ctx.globalAlpha=0.25+Math.sin(W.t*5)*0.15;
+    ctx.fillStyle=pu.t==='freeze'?'#6ae0ff':pu.t==='shield'?'#6ae0ff':pu.t==='bomb'?'#ff5a5a':pu.t==='magnet'?'#ff6a9a':'#ffd24a';
+    ctx.beginPath();ctx.arc(px,py-8*SCALE+bob,14*SCALE,0,6.29);ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.fillText(puEmoji,px,py-8*SCALE+bob);
   }
   /* овцы */
   for(var m=0;m<W.sheep.length;m++){
@@ -1289,14 +1424,24 @@ function render(){
     }
     ctx.globalAlpha=1;
   }
-  /* вспышки */
+  /* вспышки и всплывающий текст */
   for(var f=0;f<W.fx.length;f++){
     var fl=W.fx[f];
     var kf=clamp(fl.life/fl.max,0,1);
-    ctx.globalAlpha=kf;
-    ctx.fillStyle='#fff8d0';
-    ctx.beginPath();ctx.arc(sx(fl.x),sy(fl.y),fl.r*SCALE*(1.5-kf),0,6.29);ctx.fill();
-    ctx.globalAlpha=1;
+    if(fl.t==='txt'){
+      ctx.globalAlpha=kf;
+      ctx.font='bold '+((fl.size||14)*SCALE)+'px sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=fl.col||'#fff';
+      var floatY=(1-kf)*-40;
+      ctx.fillText(fl.text,sx(fl.x),sy(fl.y)+floatY);
+      ctx.globalAlpha=1;
+    }else{
+      ctx.globalAlpha=kf;
+      ctx.fillStyle='#fff8d0';
+      ctx.beginPath();ctx.arc(sx(fl.x),sy(fl.y),fl.r*SCALE*(1.5-kf),0,6.29);ctx.fill();
+      ctx.globalAlpha=1;
+    }
   }
   ctx.restore();
 }
@@ -1356,6 +1501,32 @@ function drawRam(){
     ctx.font=(rr*0.7)+'px serif';
     ctx.fillText('💕',x-Math.sin(W.t*10)*rr*1.3,yy-rr*2.7);
   }
+  /* 🛡 ЩИТ — пузырь вокруг барана */
+  if(W.shieldT>0){
+    var sAlpha=Math.min(1,W.shieldT/2)*0.45;
+    var sPulse=Math.sin(W.t*4)*2*SCALE;
+    ctx.globalAlpha=sAlpha;
+    ctx.strokeStyle='#6ae0ff';ctx.lineWidth=3*SCALE;
+    ctx.beginPath();ctx.arc(x,yy-rr*0.5,rr*2.4+sPulse,0,6.29);ctx.stroke();
+    ctx.fillStyle='rgba(106,224,255,.12)';
+    ctx.beginPath();ctx.arc(x,yy-rr*0.5,rr*2.4+sPulse,0,6.29);ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.font=(10*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('🛡'+Math.ceil(W.shieldT)+'с',x,yy-rr*3.6);
+  }
+  /* 🧲 МАГНИТ — поле вокруг барана */
+  if(W.magnetT>0){
+    var mAlpha=Math.min(1,W.magnetT/2)*0.3;
+    ctx.globalAlpha=mAlpha;
+    ctx.strokeStyle='#ff6a9a';ctx.lineWidth=2*SCALE;
+    ctx.setLineDash([4*SCALE,4*SCALE]);
+    ctx.beginPath();ctx.arc(x,yy-rr*0.5,rr*6,0,6.29);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=1;
+    ctx.font=(10*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#ff6a9a';
+    ctx.fillText('🧲'+Math.ceil(W.magnetT)+'с',x+rr*2,yy-rr*3.6);
+  }
   ctx.globalAlpha=1;
 }
 function drawSheep(s){
@@ -1374,7 +1545,19 @@ function drawSheep(s){
   var hgt=rr*3.0*scaleB,wd=rr*3.6*scaleB;
   var ddx=s.tx-s.x;
   var flip=(ddx>0.3)?false:((ddx<-0.3)?true:(Math.sin(s.wob*1.6)<0));
-  drawSpr(SPR.sheep,x,y+rr*0.8*scaleB-hgt/2+bob,wd,hgt,flip,Math.sin(wob*1.6)*0.05);
+  /* золотая овца — золотой оттенок */
+  if(s.golden){
+    ctx.save();
+    ctx.shadowColor='#ffd24a';ctx.shadowBlur=18*SCALE;
+    drawSpr(SPR.sheep,x,y+rr*0.8*scaleB-hgt/2+bob,wd,hgt,flip,Math.sin(wob*1.6)*0.05);
+    ctx.restore();
+    /* золотые частицы вокруг */
+    if(Math.random()<0.3)spawnPart(s.x+rf(-.3,.3),s.y+rf(-.3,.3),'#ffd24a',1.5,0.5);
+    ctx.font=(14*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('⭐',x,y-rr*2.3*scaleB+bob);
+  }else{
+    drawSpr(SPR.sheep,x,y+rr*0.8*scaleB-hgt/2+bob,wd,hgt,flip,Math.sin(wob*1.6)*0.05);
+  }
   /* беременная: пульс, «!», сердечко и розовый оттенок */
   if(preg){
     var pul=Math.sin(W.t*6)*0.05;
@@ -1649,6 +1832,32 @@ function drawRamLegacy(){
     ctx.font=(rr*0.55)+'px serif';
     ctx.fillText('💕',x-Math.sin(W.t*10)*rr*1.3,yy-rr*1.1);
   }
+  /* 🛡 ЩИТ — пузырь */
+  if(W&&W.shieldT>0){
+    var sA=Math.min(1,W.shieldT/2)*0.45;
+    var sP=Math.sin((W.t||0)*4)*2*SCALE;
+    ctx.globalAlpha=sA;
+    ctx.strokeStyle='#6ae0ff';ctx.lineWidth=3*SCALE;
+    ctx.beginPath();ctx.arc(x,yy-rr*0.5,rr*2.4+sP,0,6.29);ctx.stroke();
+    ctx.fillStyle='rgba(106,224,255,.12)';
+    ctx.beginPath();ctx.arc(x,yy-rr*0.5,rr*2.4+sP,0,6.29);ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.font=(10*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('🛡'+Math.ceil(W.shieldT)+'с',x,yy-rr*3.6);
+  }
+  /* 🧲 МАГНИТ */
+  if(W&&W.magnetT>0){
+    var mA=Math.min(1,W.magnetT/2)*0.3;
+    ctx.globalAlpha=mA;
+    ctx.strokeStyle='#ff6a9a';ctx.lineWidth=2*SCALE;
+    ctx.setLineDash([4*SCALE,4*SCALE]);
+    ctx.beginPath();ctx.arc(x,yy-rr*0.5,rr*6,0,6.29);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=1;
+    ctx.font=(10*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#ff6a9a';
+    ctx.fillText('🧲'+Math.ceil(W.magnetT)+'с',x+rr*2,yy-rr*3.6);
+  }
   ctx.globalAlpha=1;
 }
 
@@ -1675,13 +1884,16 @@ function drawSheepLegacy(s){
   ctx.beginPath();ctx.ellipse(x-rr*0.5+legS*1.5*SCALE,y+rr*0.78,rr*0.16,rr*0.09,0,0,6.29);ctx.fill();
   ctx.beginPath();ctx.ellipse(x+rr*0.5-legS*1.5*SCALE,y+rr*0.78,rr*0.16,rr*0.09,0,0,6.29);ctx.fill();
   /* тело */
-  ctx.fillStyle=preg?'#ffd8e4':'#f7f3ea';
+  var bodyCol=preg?'#ffd8e4':(s.golden?'#ffe066':'#f7f3ea');
+  ctx.fillStyle=bodyCol;
   ctx.beginPath();
   ctx.ellipse(x,y-rr*0.15+bob,rr*1.25*scaleB,rr*0.95*scaleB,0,0,6.29);
   ctx.fill();
-  ctx.strokeStyle='#2a1a0a';ctx.lineWidth=Math.max(1.2,rr*0.13);ctx.stroke();
+  if(s.golden){ctx.save();ctx.shadowColor='#ffd24a';ctx.shadowBlur=12*SCALE;}
+  ctx.strokeStyle=s.golden?'#c8a020':'#2a1a0a';ctx.lineWidth=Math.max(1.2,rr*0.13);ctx.stroke();
+  if(s.golden)ctx.restore();
   /* кудряшки */
-  ctx.fillStyle=preg?'#ffc8d8':'#e9e2d2';
+  ctx.fillStyle=preg?'#ffc8d8':(s.golden?'#ffd24a':'#e9e2d2');
   for(var ci=0;ci<3;ci++){
     var ca=ci/3*6.28;
     ctx.beginPath();
@@ -1691,7 +1903,7 @@ function drawSheepLegacy(s){
   /* голова */
   ctx.save();
   ctx.translate(x,y-rr*0.62+bob);
-  ctx.fillStyle='#f0e4d4';
+  ctx.fillStyle=s.golden?'#fff0a0':'#f0e4d4';
   ctx.beginPath();ctx.arc(0,0,rr*0.52,0,6.29);ctx.fill();
   ctx.strokeStyle='#2a1a0a';ctx.lineWidth=Math.max(1.2,rr*0.12);ctx.stroke();
   /* глаза с бликами */
@@ -1724,6 +1936,12 @@ function drawSheepLegacy(s){
     ctx.fillText('!',x,y-rr*1.75+bob);
     ctx.font=(11*SCALE)+'px serif';
     ctx.fillText('❤️',x+rr*0.95,y-rr*1.3+bob);
+  }
+  /* золотая овца — звезда сверху */
+  if(s.golden&&!preg){
+    ctx.font=(14*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('⭐',x,y-rr*1.8+bob);
+    if(Math.random()<0.3)spawnPart(s.x+rf(-.3,.3),s.y+rf(-.3,.3),'#ffd24a',1.5,0.5);
   }
 }
 
@@ -2051,6 +2269,42 @@ $('x2Btn').onclick=function(){sfx('click');x2Score();};
 $('adBtn').onclick=function(){sfx('click');adScore();};
 $('menuBtn2').onclick=function(){sfx('click');toMenu();};
 $('shareBtn').onclick=function(){sfx('click');share();};
+/* 🆕 бонусы за рекламу на старте */
+var _startBonuses={shield:0,magnet:0};
+$('shieldStartBtn').onclick=function(){
+  sfx('click');
+  watchAd(function(ok){
+    if(!ok)return;
+    _startBonuses.shield=8;
+    toast('🛡 Начнёшь со щитом!');
+    startRun();
+  });
+};
+$('magnetStartBtn').onclick=function(){
+  sfx('click');
+  watchAd(function(ok){
+    if(!ok)return;
+    _startBonuses.magnet=10;
+    toast('🧲 Начнёшь с магнитом!');
+    startRun();
+  });
+};
+/* 🆕 +30 секунд за рекламу на экране Game Over */
+$('bonusTimeBtn').onclick=function(){
+  sfx('click');
+  watchAd(function(ok){
+    if(!ok)return;
+    W.over=false;
+    W.time+=30;
+    W.ram.inv=2;
+    musicOff=false;
+    musStart();
+    $('bonusTimeBtn').style.display='none';
+    showScr('');
+    paintHud();
+    toast('⏱ +30 секунд!');
+  });
+};
 
 /* ============================================================
    СТАРТ
@@ -2120,5 +2374,5 @@ try{window.__MOD={
 
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2972f79cac597dd',t:'MTc4NjQ1MDczMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2972f79cac597dd',t:'MTc4NjQ1MDczMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37393d20e1b3c20',t:'MTc4ODc2MTcxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
