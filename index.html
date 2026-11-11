@@ -27,6 +27,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 #timeChip{color:#9ae87a}
 #comboChip{color:#ffcf6a;display:none;border-color:rgba(255,200,80,.5)}
 #comboChip.on{display:flex}
+#furyChip{color:#ffad61;display:flex;border-color:rgba(255,150,70,.35)}
+#furyChip.ready{color:#ffe08a;border-color:#ffb52e;box-shadow:0 0 14px rgba(255,120,30,.65);animation:furyPulse .7s infinite alternate}
+#furyChip.on{color:#fff0b0;background:rgba(140,45,5,.9);border-color:#ffdc65;box-shadow:0 0 18px rgba(255,100,20,.8)}
+@keyframes furyPulse{from{transform:scale(1)}to{transform:scale(1.08)}}
 #hudR{margin-left:auto;display:flex;gap:5px;flex-shrink:0}
 .ico{pointer-events:auto;width:32px;height:32px;border:1px solid rgba(180,255,140,.35);border-radius:10px;cursor:pointer;
   background:rgba(16,30,12,.85);color:#d8ffc0;font-size:15px;display:flex;align-items:center;justify-content:center;
@@ -40,12 +44,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 #joy.on{display:block}
 #joy .kn{position:absolute;left:34px;top:34px;width:44px;height:44px;border-radius:50%;
   background:rgba(255,255,255,.4);border:2px solid rgba(255,255,255,.55)}
-#btns{position:absolute;right:12px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:7;pointer-events:none}
+#btns{position:absolute;right:12px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:7;pointer-events:none;display:none;align-items:flex-end;gap:10px}
 #btns .b{pointer-events:auto;width:62px;height:62px;border-radius:50%;border:2px solid rgba(255,255,255,.3);
   font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;
   background:rgba(255,255,255,.13);backdrop-filter:blur(4px);box-shadow:0 3px 0 rgba(0,0,0,.35)}
 #btns .b:active{transform:translateY(2px)}
 #btns .b small{font-size:8px;display:block;line-height:1}
+#furyBtn{flex-direction:column;font-size:19px;background:rgba(105,35,8,.35);border-color:rgba(255,170,70,.4)}
+#furyBtn.ready{background:linear-gradient(180deg,rgba(255,190,55,.85),rgba(235,70,15,.85));box-shadow:0 0 22px rgba(255,100,20,.8);animation:furyPulse .55s infinite alternate}
+#furyBtn.on{background:linear-gradient(180deg,#ffe46a,#f05b16);color:#4a1300;border-color:#fff0a0}
+#pwFury{background:linear-gradient(180deg,#ffe08a,#ff9d32 55%,#ed5b1c)!important;color:#431700!important}
 
 /* экраны */
 .scr{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;
@@ -109,6 +117,16 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
 #pwScr .pwGo{background:linear-gradient(180deg,#a9f5c9,#3ddc84 55%,#22b56c);color:#052a12}
 #pwScr .pwOut{background:linear-gradient(180deg,#ffd0d8,#ff8fa3 55%,#e05b74);color:#3a0c16}
 #pwScr .pwSm{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.07));font-size:14px;min-height:42px}
+#intro{overflow-y:auto;touch-action:pan-y}
+@media(max-height:650px){
+  #intro{justify-content:flex-start;gap:7px;padding-top:14px;padding-bottom:18px}
+  #intro h1{font-size:32px}
+  #intro>div:first-child{font-size:38px!important}
+  #intro>div:first-child img{height:52px!important}
+  #intro .btn{min-height:38px;padding:9px 22px;font-size:14px}
+  #intro .btn.sm{min-height:34px;padding:8px 15px;font-size:12px}
+  #intro .sub{line-height:1.35}
+}
 @media(max-height:560px){
   #joy{width:96px;height:96px}
   #joy .kn{left:28px;top:28px;width:40px;height:40px}
@@ -129,6 +147,7 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
       <div class="chip" id="lvlChip">📍 <span id="lvlTxt">Ур.1</span></div>
       <div class="chip" id="sheepChip">🐑 <span id="sheepTxt">0/4</span></div>
       <div class="chip" id="comboChip">🔥 x<span id="comboTxt">1</span></div>
+      <div class="chip" id="furyChip" title="Баранья ярость">😡 <span id="furyTxt">0%</span></div>
       <div style="flex:1"></div>
       <div id="hudR">
         <button class="ico" id="sndBtn" title="Звук">🔊</button>
@@ -138,7 +157,7 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
   </div>
 
   <div id="joy"><div class="kn"></div></div>
-  <div id="btns"><button class="b" id="dashBtn">💨<small>рывок</small></button></div>
+  <div id="btns"><button class="b" id="furyBtn" title="Баранья ярость">😡<small id="furyBtnTxt">0%</small></button><button class="b" id="dashBtn">💨<small>рывок</small></button></div>
 
   <div id="bigMsg"></div>
 
@@ -156,6 +175,7 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
     <button class="btn ad" id="adBtn">📺 +50 очков за рекламу</button>
     <button class="btn ad" id="shieldStartBtn">📺 ЩИТ на старт (8 сек)</button>
     <button class="btn ad" id="magnetStartBtn">📺 МАГНИТ на старт (10 сек)</button>
+    <button class="btn ad" id="furyStartBtn">📺 ЯРОСТЬ на старт (8 сек)</button>
     <div class="sub" id="metaLine" style="font-size:11.5px"></div>
     <div class="sub" id="pcHint" style="font-size:11.5px;display:none">🖥 WASD/стрелки — бег · Пробел — рывок</div>
   </div>
@@ -173,13 +193,15 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
       ❄️ <b>Снежинка</b> — заморозить деда · ⚡ <b>молния</b> — ускорение<br>
       🛡 <b>Щит</b> — неуязвимость · 🧲 <b>магнит</b> — тянет овец<br>
       💣 <b>Бомба</b> — взорвать ВСЕХ овец · ⭐ <b>золотая овца</b> — ×3 очков!<br>
+      😡 <b>Баранья ярость</b> — заряжается взрывами. Жми F или кнопку 😡:<br>
+      8 секунд скорости, ×2 очков и цепных взрывов соседних овец!<br>
       📍 <b>Взорви N овец</b> (смотри чип 🐑) — уровень пройден!<br>
       ✅ Заставка «УРОВЕНЬ ПРОЙДЕН» → новая локация:<br>
       ферма → закат → ночь → осень → пустыня → снег ❄️<br>
       🚧 С каждым уровнем сложнее: <b>заборы-стены</b>,<br>
       овцы быстрее, дед злее, овец больше!<br>
       ⏱ У тебя <b>75 секунд</b> + бонус 12с за уровень. Набери максимум!<br><br>
-      🖥 <b>ПК:</b> WASD/стрелки · Пробел — рывок · P — пауза
+      🖥 <b>ПК:</b> WASD/стрелки · Пробел — рывок · F — ярость · P — пауза
     </div>
     <button class="btn" id="howClose">Понял</button>
   </div>
@@ -218,6 +240,7 @@ h2{font-size:clamp(24px,7vw,32px);font-weight:900;color:#ffe9c0}
 <div id="pwScr" role="dialog" aria-modal="true" aria-label="Пауза">
   <h3>⏸️ Пауза</h3>
   <button class="pwGo" id="pwGo">Продолжить</button>
+  <button class="pwSm" id="pwFury">📺 Включить ЯРОСТЬ за ролик</button>
   <button class="pwSm" id="pwSnd">🔊 Звук: вкл</button>
   <button class="pwSm vibBtn" id="pwVib">Вибрация: вкл</button>
   <button class="pwOut" id="pwOut">Выйти в меню</button>
@@ -575,7 +598,7 @@ function checkAds(){
   try{Promise.resolve(b.supportsAsync('VKWebAppShowNativeAds')).then(function(ok){nativeOK=!!ok;}).catch(function(){nativeOK=true;});}catch(e){}
 }
 function watchAd(cb){
-  if(adBusy)return;
+  if(adBusy){toast('📺 Дождись окончания текущего ролика');if(cb)cb(false);return;}
   if(!VK.ready||!nativeOK){toast('✨ Бонус выдан');setTimeout(function(){cb(true);},250);return;}
   adBusy=true;toast('📺 Загружаем ролик…');
   bridge.send('VKWebAppShowNativeAds',{ad_format:'reward'}).then(function(d){
@@ -597,14 +620,14 @@ function showInterstitial(cb){
    СОХРАНЕНИЕ + синхронизация (2.3.8)
    ============================================================ */
 var SAVE='sven_v1';
-var P={name:'Герой',best:0,games:0,booms:0,runs:0,seenHow:0,bonus:0,snd:true};
+var P={name:'Герой',best:0,games:0,booms:0,runs:0,seenHow:0,bonus:0,furies:0,snd:true};
 function save(){
   try{localStorage.setItem(SAVE,JSON.stringify(P));}catch(e){}
   if(VK.ready)bridge.send('VKWebAppStorageSet',{key:SAVE,value:JSON.stringify(P)}).catch(nop);
 }
 function mergeSave(o){
   if(!o||typeof o!=='object')return;
-  ['best','games','booms','runs','bonus'].forEach(function(k){
+  ['best','games','booms','runs','bonus','furies'].forEach(function(k){
     if(typeof o[k]==='number'&&isFinite(o[k]))P[k]=Math.max(P[k]||0,Math.max(0,Math.round(o[k])));
   });
   if(typeof o.name==='string'&&o.name)P.name=o.name;
@@ -646,17 +669,20 @@ var LOCALES=[
 function sheepNeedFor(lvl){return 3+lvl;}              /* lvl1=4, lvl2=5, lvl3=6… */
 function locOf(lvl){return LOCALES[(lvl-1)%LOCALES.length];}
 function mkArena(){
-  var _pendingShield=0,_pendingMagnet=0;
+  var _pendingShield=0,_pendingMagnet=0,_pendingFury=0;
   if(_startBonuses.shield){_pendingShield=_startBonuses.shield;_startBonuses.shield=0;}
   if(_startBonuses.magnet){_pendingMagnet=_startBonuses.magnet;_startBonuses.magnet=0;}
+  if(_startBonuses.fury){_pendingFury=_startBonuses.fury;_startBonuses.fury=0;}
   W={ram:null,sheep:[],oldman:null,dog:null,parts:[],powerups:[],fx:[],
      bushes:[],rocks:[],fences:[],t:0,time:75,lives:3,score:0,combo:0,comboT:0,
      anger:0,freezeT:0,speedT:0,powerT:0,over:false,won:false,
      lvl:1,loc:locOf(1),yellCd:0,levelSheep:0,sheepNeed:sheepNeedFor(1),levelUp:false,
      sawDog:false,killer:'',
-     shieldT:_pendingShield,magnetT:_pendingMagnet};
+     shieldT:_pendingShield,magnetT:_pendingMagnet,
+     fury:0,furyT:_pendingFury,furyReadyShown:false,furyUsed:_pendingFury>0?1:0,furyAdUsed:false,furyChains:0};
   if(_pendingShield>0)toast('🛡 Щит активен '+_pendingShield+' сек!');
   if(_pendingMagnet>0)toast('🧲 Магнит активен '+_pendingMagnet+' сек!');
+  if(_pendingFury>0){P.furies=(P.furies||0)+1;toast('😡 БАРАНЬЯ ЯРОСТЬ на старте! ×2 очки!');}
   spawnRam();
   spawnSheep();
   spawnOldMan();
@@ -777,6 +803,41 @@ function unstuck(e,dt){
 }
 
 /* ============================================================
+   БАРАНЬЯ ЯРОСТЬ
+   Заряд копится за взрывы и не тухнет — игрок сам выбирает момент.
+   8 секунд: скорость, быстрые взрывы, ×2 очки и цепная реакция.
+   ============================================================ */
+var FURY_MAX=100,FURY_TIME=8;
+function addFury(n){
+  if(!W||W.over||W.levelUp||W.furyT>0)return;
+  W.fury=clamp((W.fury||0)+n,0,FURY_MAX);
+  if(W.fury>=FURY_MAX&&!W.furyReadyShown){
+    W.furyReadyShown=true;
+    sfx('combo',.9);haptic('medium');
+    msg('😡 ЯРОСТЬ ГОТОВА!');
+    toast('Нажми F или кнопку 😡 — время цепных взрывов!');
+  }
+  paintHud();
+}
+function activateFury(free){
+  if(!W||G.state!=='play'||W.over||W.levelUp)return false;
+  if(W.furyT>0){toast('😡 Ярость уже бушует!');return false;}
+  if(!free&&(W.fury||0)<FURY_MAX){sfx('err');toast('Ярость заряжена на '+Math.floor(W.fury||0)+'%');return false;}
+  W.fury=0;W.furyReadyShown=false;W.furyT=FURY_TIME;
+  W.furyUsed=(W.furyUsed||0)+1;
+  P.furies=(P.furies||0)+1;
+  W.shake=Math.max(W.shake||0,7);
+  msg('😡 БАРАНЬЯ ЯРОСТЬ! ×2');
+  sfx('level',1);sfx('boom',.5);haptic('heavy');
+  confettiBurst();save();paintHud();
+  return true;
+}
+function updateFury(dt){
+  if(!W||W.furyT<=0)return;
+  W.furyT=Math.max(0,W.furyT-dt);
+  if(W.furyT<=0){toast('😌 Ярость закончилась. Заряжай снова!');paintHud();}
+}
+/* ============================================================
    ГЕЙМПЛЕЙ
    ============================================================ */
 function updateRam(dt){
@@ -823,7 +884,7 @@ function updateRam(dt){
   if(IN.mag>0.1||keysHeld()){
     var dx=IN.mx,dy=IN.my;
     if(!IN.mag){dx=IN.nx;dy=IN.ny;}
-    var spd=r.speed*(W.speedT>0?1.5:1);
+    var spd=r.speed*(W.speedT>0?1.5:1)*(W.furyT>0?1.35:1);
     r.vx=dx*spd;r.vy=dy*spd;
     r.walkT+=dt*10;
     if(Math.abs(dx)>0.1)r.face=dx>0?1:-1;
@@ -851,7 +912,7 @@ function updateRam(dt){
   }
   /* рывок */
   if(IN.dash&&r.dashCd<=0){
-    r.dashCd=1.1;
+    r.dashCd=W.furyT>0?0.45:1.1;
     var dd=IN.mx||IN.nx,dy2=IN.my||IN.ny;
     if(!dd&&!dy2){dd=r.face;dy2=0;}
     var dl=Math.hypot(dd,dy2)||1;
@@ -892,7 +953,7 @@ function updateSheep(dt){
          Не повторяем с уже беременной овцой и пока действует
          кулдаун (иначе баран залипал на овце навсегда). */
       if(r.mateT<=0&&r.mateCd<=0&&s.state!=='preg'&&d<(s.r+r.r)*(s.r+r.r)){
-        s.state='preg';s.pregT=3;
+        s.state='preg';s.pregT=W.furyT>0?1.35:3;s.pregMax=s.pregT;
         sfx('heart');sfx('puff');haptic('light');
         heartsAt(s.x,s.y);
         /* баран «делает своё дело»: прыгает на месте у овцы */
@@ -918,13 +979,31 @@ function explodeSheep(i){
   var s=W.sheep[i];
   s.dead=1;
   var pts=s.golden?30:10;
+  if(W.furyT>0)pts*=2;
   if(W.comboT>0)pts*=W.combo;
   W.score+=pts;
   W.combo++;
   W.comboT=2.5;
   W.anger=Math.min(6,W.anger+0.25);
   P.booms++;
+  addFury(s.golden?30:18);
   spawnBoom(s.x,s.y);
+  /* В ярости взрыв поджигает ближайших овец — цепная реакция. */
+  if(W.furyT>0){
+    var chained=0;
+    for(var cj=0;cj<W.sheep.length;cj++){
+      var cs=W.sheep[cj];
+      if(cj===i||cs.dead||cs.state!=='idle')continue;
+      if(dist2(s.x,s.y,cs.x,cs.y)<6.25){
+        cs.state='preg';cs.pregT=0.55+chained*0.08;cs.pregMax=cs.pregT;
+        chained++;heartsAt(cs.x,cs.y);
+      }
+    }
+    if(chained){
+      W.furyChains=(W.furyChains||0)+chained;
+      W.fx.push({t:'txt',x:s.x,y:s.y-1.8,text:'🔥 ЦЕПЬ +'+chained,col:'#ffad61',life:1.4,max:1.4,size:17});
+    }
+  }
   if(s.golden){
     /* золотой взрыв — больше частиц */
     for(var gi=0;gi<8;gi++){
@@ -1157,8 +1236,9 @@ function updatePowerups(dt){
           if(!W.sheep[bi].dead){
             spawnBoom(W.sheep[bi].x,W.sheep[bi].y);
             var bPts=W.sheep[bi].golden?30:10;
+            if(W.furyT>0)bPts*=2;
             if(W.comboT>0)bPts*=W.combo;
-            W.score+=bPts;P.booms++;W.levelSheep++;
+            W.score+=bPts;P.booms++;addFury(W.sheep[bi].golden?30:18);W.levelSheep++;
             W.sheep[bi].dead=1;
           }
         }
@@ -1189,6 +1269,7 @@ function updatePowerups(dt){
 }
 function updateTime(dt){
   if(W.over||W.levelUp)return;   /* время не тикает на заставке */
+  updateFury(dt);
   W.time-=dt;
   if(W.time<=0){W.time=0;endRun(true);}
   if(W.comboT>0){
@@ -1211,6 +1292,7 @@ function endRun(won){
   $('overScore').textContent=W.score;
   $('overStats').innerHTML='Взорвано овец: <b style="color:#ff8a9a">'+P.booms+'</b><br>'+
     'Лучший комбо: <b style="color:#ffd24a">x'+W.combo+'</b><br>'+
+    'Яростей за забег: <b style="color:#ff9d55">'+(W.furyUsed||0)+'</b> · цепных овец: <b style="color:#ff9d55">'+(W.furyChains||0)+'</b><br>'+
     'Рекорд: <b style="color:#ffd24a">'+P.best+'</b>';
   $('reviveBtn').style.display=won?'none':'block';
   /* кнопка "+30 сек" — если время вышло */
@@ -1410,6 +1492,7 @@ function render(){
   drawDog();
   /* баран */
   drawRam();
+  drawFuryFx();
   /* частицы */
   for(var q=0;q<W.parts.length;q++){
     var pt=W.parts[q];
@@ -1443,6 +1526,27 @@ function render(){
       ctx.globalAlpha=1;
     }
   }
+  ctx.restore();
+  if(W.furyT>0){
+    ctx.fillStyle='rgba(255,90,15,'+(0.035+Math.sin(W.t*8)*0.012)+')';
+    ctx.fillRect(0,0,VW,VH);
+  }
+}
+function drawFuryFx(){
+  if(!W||W.furyT<=0||!W.ram)return;
+  var r=W.ram,x=sx(r.x),y=sy(r.y),rr=r.r*TILE*SCALE;
+  ctx.save();
+  ctx.globalAlpha=.65+Math.sin(W.t*10)*.15;
+  ctx.strokeStyle='#ff9d32';ctx.lineWidth=3*SCALE;
+  ctx.beginPath();ctx.arc(x,y-rr*.4,rr*(2.1+Math.sin(W.t*7)*.15),0,6.29);ctx.stroke();
+  ctx.strokeStyle='#ffe08a';ctx.lineWidth=1.4*SCALE;
+  ctx.beginPath();ctx.arc(x,y-rr*.4,rr*2.45,0,6.29);ctx.stroke();
+  ctx.globalAlpha=1;
+  ctx.font=(18*SCALE)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('🔥',x-rr*1.5,y-rr*2.2+Math.sin(W.t*9)*3);
+  ctx.fillText('🔥',x+rr*1.5,y-rr*2.0-Math.sin(W.t*9)*3);
+  ctx.font='900 '+(11*SCALE)+'px sans-serif';ctx.fillStyle='#ffe08a';
+  ctx.fillText('×2 '+Math.ceil(W.furyT)+'с',x,y-rr*3.5);
   ctx.restore();
 }
 function roundRect(c,x,y,w,h,r){
@@ -1536,7 +1640,7 @@ function drawSheep(s){
   var preg=s.state==='preg';
   var wob=preg?W.t*16:s.wob*3;
   var bob=Math.sin(wob)*2*SCALE;
-  var scaleB=1+(preg?(3-s.pregT)*0.13:0);
+  var scaleB=1+(preg?((s.pregMax||3)-s.pregT)*0.13:0);
   if(preg)x+=Math.sin(W.t*22)*0.6*SCALE;
   /* тень */
   ctx.fillStyle='rgba(0,0,0,.25)';
@@ -1867,7 +1971,7 @@ function drawSheepLegacy(s){
   var preg=s.state==='preg';
   var wob=preg?W.t*16:s.wob*3;
   var bob=Math.sin(wob)*2*SCALE;
-  var scaleB=1+(preg?(3-s.pregT)*0.13:0);
+  var scaleB=1+(preg?((s.pregMax||3)-s.pregT)*0.13:0);
   /* дёрганье при раздувании */
   if(preg)x+=Math.sin(W.t*22)*0.6*SCALE;
   ctx.fillStyle='rgba(0,0,0,.25)';
@@ -2076,6 +2180,7 @@ document.addEventListener('keydown',function(e){
   keys[k]=true;
   if(k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright')e.preventDefault();
   if(k===' '){e.preventDefault();IN.dash=true;}
+  if((k==='f'||k==='а')&&!e.repeat){e.preventDefault();activateFury(false);}
   if(k==='p'||k==='з'||k==='Escape'||k==='esc'){
     if(G.state==='play'&&!G.paused)pauseGame();
     else if(G.paused)resumeGame();
@@ -2098,6 +2203,7 @@ function keyboardInput(){
     IN.mag=(dx||dy)?1:0;
   }
 }
+$('furyBtn').addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();activateFury(false);},{passive:false});
 $('dashBtn').addEventListener('pointerdown',function(e){e.preventDefault();IN.dash=true;},{passive:false});
 $('dashBtn').addEventListener('pointerup',function(e){e.preventDefault();IN.dash=false;},{passive:false});
 $('dashBtn').addEventListener('pointercancel',function(){IN.dash=false;});
@@ -2116,13 +2222,15 @@ function showScr(id){
   /* джойстик и кнопка рывка — ТОЛЬКО на сенсорных устройствах,
      чтобы на десктопе/вебе они не перекрывали интерфейс */
   $('joy').classList.toggle('on',inGame&&!G.paused&&touchOn);
-  $('btns').style.display=(inGame&&touchOn)?'':'none';
+  $('btns').style.display=(inGame&&touchOn)?'flex':'none';
 }
 function pauseGame(){
   if(G.paused||G.state!=='play'||W.over)return;
   G.paused=true;
   musStop();
   paintSndBtns();paintVibBtns();
+  var pf=$('pwFury');
+  if(pf){pf.style.display=(W.furyAdUsed||W.furyT>0)?'none':'block';pf.disabled=false;}
   showScr('');
   $('pwScr').classList.add('on');
 }
@@ -2150,7 +2258,7 @@ function startRun(){
   musStart();
   paintHud();
   if(!P.seenHow){P.seenHow=1;save();}
-  msg('🐏 УРОВЕНЬ 1: ВЗОРВИ '+W.sheepNeed+' ОВЕЦ!');
+  msg(W.furyT>0?'😡 ЯРОСТЬ! ×2 ОЧКОВ И ЦЕПНЫЕ ВЗРЫВЫ!':'🐏 УРОВЕНЬ 1: ВЗОРВИ '+W.sheepNeed+' ОВЕЦ!');
 }
 function msg(t){
   var el=$('bigMsg');
@@ -2230,6 +2338,11 @@ function paintHud(){
   var cc=$('comboChip');
   if(W.combo>1){cc.classList.add('on');$('comboTxt').textContent=W.combo;}
   else cc.classList.remove('on');
+  var fc=$('furyChip'),fb=$('furyBtn'),fury=Math.floor(W.fury||0),fa=W.furyT>0;
+  fc.classList.toggle('ready',fury>=FURY_MAX&&!fa);fc.classList.toggle('on',fa);
+  $('furyTxt').textContent=fa?Math.ceil(W.furyT)+'с ×2':fury+'%';
+  if(fb){fb.classList.toggle('ready',fury>=FURY_MAX&&!fa);fb.classList.toggle('on',fa);
+    $('furyBtnTxt').textContent=fa?Math.ceil(W.furyT)+'с':(fury>=FURY_MAX?'ЖМИ!':fury+'%');}
   /* таймер краснеет */
   $('timeChip').style.color=W.time<10?'#ff5a5a':'#9ae87a';
 }
@@ -2247,7 +2360,8 @@ function openStats(){
     '<div class="stb"><b style="color:#ffd24a">'+P.best+'</b><span>рекорд очков</span></div>'+
     '<div class="stb"><b>'+P.booms+'</b><span>взорвано овец</span></div>'+
     '<div class="stb"><b>'+P.games+'</b><span>сыграно игр</span></div>'+
-    '<div class="stb"><b style="color:#ffd24a">+'+P.bonus+'</b><span>бонус за рекламу</span></div>';
+    '<div class="stb"><b style="color:#ffd24a">+'+P.bonus+'</b><span>бонус за рекламу</span></div>'+
+    '<div class="stb"><b style="color:#ff9d55">'+(P.furies||0)+'</b><span>бараньих яростей</span></div>';
   showScr('statScr');
 }
 $('playBtn').onclick=startRun;
@@ -2270,7 +2384,7 @@ $('adBtn').onclick=function(){sfx('click');adScore();};
 $('menuBtn2').onclick=function(){sfx('click');toMenu();};
 $('shareBtn').onclick=function(){sfx('click');share();};
 /* 🆕 бонусы за рекламу на старте */
-var _startBonuses={shield:0,magnet:0};
+var _startBonuses={shield:0,magnet:0,fury:0};
 $('shieldStartBtn').onclick=function(){
   sfx('click');
   watchAd(function(ok){
@@ -2287,6 +2401,23 @@ $('magnetStartBtn').onclick=function(){
     _startBonuses.magnet=10;
     toast('🧲 Начнёшь с магнитом!');
     startRun();
+  });
+};
+$('furyStartBtn').onclick=function(){
+  sfx('click');var el=$('furyStartBtn');if(el.disabled)return;el.disabled=true;
+  watchAd(function(ok){
+    el.disabled=false;if(!ok)return;
+    _startBonuses.fury=FURY_TIME;
+    startRun();
+  });
+};
+$('pwFury').onclick=function(){
+  var el=$('pwFury');if(el.disabled||W.furyAdUsed)return;el.disabled=true;sfx('click');
+  watchAd(function(ok){
+    if(!ok){el.disabled=false;return;}
+    W.furyAdUsed=true;
+    activateFury(true);
+    resumeGame();
   });
 };
 /* 🆕 +30 секунд за рекламу на экране Game Over */
@@ -2359,7 +2490,8 @@ window.__S={
     IN.mx=v.mx||0;IN.my=v.my||0;IN.nx=v.nx||0;IN.ny=v.ny||0;
     IN.mag=v.mag||0;IN.dash=!!v.dash;
   },
-  showScr:showScr,revive:revive
+  showScr:showScr,revive:revive,addFury:addFury,activateFury:activateFury,updateFury:updateFury,
+  FURY_MAX:FURY_MAX,FURY_TIME:FURY_TIME
 };
 try{window.__MOD={
   link:function(){return typeof vkAppLink==='function'?vkAppLink():null;},
@@ -2374,5 +2506,5 @@ try{window.__MOD={
 
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2972f79cac597dd',t:'MTc4NjQ1MDczMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37393d20e1b3c20',t:'MTc4ODc2MTcxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2972f79cac597dd',t:'MTc4NjQ1MDczMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37393d20e1b3c20',t:'MTc4ODc2MTcxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a57d0e3d7d805621',t:'MTc5NDIyOTgwNQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a57d0e3d7d805621',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
